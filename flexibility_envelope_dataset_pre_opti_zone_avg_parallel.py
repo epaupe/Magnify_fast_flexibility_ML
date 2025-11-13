@@ -35,8 +35,8 @@ from src.agents_scalar import MPCScalar, RB
 
 BASE_DIR = r"C:\Users\palo\magnify-main_DATABASE_SCALAR"
 
-START_TIME = datetime.datetime(2020, 2, 2, 0, 0, 0)
-END_TIME   = datetime.datetime(2020, 2, 3, 0, 0, 0)
+START_TIME = datetime.datetime(2020, 1, 2, 0, 0, 0)
+END_TIME   = datetime.datetime(2020, 12, 29, 0, 0, 0)
 HISTORY_HOURS = 8
 HORIZON_HOURS = 24
 STEPS_PER_HOUR = 4
@@ -46,7 +46,8 @@ N_CORES = 16  # Number of logical CPU cores to use for parallelization
 
 # Building archetypes 
 BUILDING_IDS = [
-    "ep_SFH_age_0_climate_0_1241",
+    "ep_SFH_age_0_climate_0_1241"]
+""" ,
     "ep_SFH_age_0_climate_0_649", "ep_SFH_age_0_climate_0_821", "ep_SFH_age_0_climate_0_1241",
     "ep_SFH_age_0_climate_1_259", "ep_SFH_age_0_climate_1_493", "ep_SFH_age_0_climate_1_535",
     "ep_SFH_age_0_climate_2_1325", "ep_SFH_age_0_climate_2_1691", "ep_SFH_age_0_climate_2_1972",
@@ -57,7 +58,7 @@ BUILDING_IDS = [
     "ep_SFH_age_1_climate_1_32", "ep_SFH_age_1_climate_1_429", "ep_SFH_age_1_climate_1_458",
     "ep_SFH_age_1_climate_2_762", "ep_SFH_age_1_climate_2_852", "ep_SFH_age_1_climate_2_1161",
     "ep_SFH_age_1_climate_3_260", "ep_SFH_age_1_climate_3_451", "ep_SFH_age_1_climate_3_597"
-]
+] """
 
 # =====================================================
 # STEP 1 — OPTIMIZATION: Run MPC and retrieve UB/LB arrays
