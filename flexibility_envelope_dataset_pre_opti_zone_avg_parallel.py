@@ -42,13 +42,15 @@ HORIZON_HOURS = 24
 STEPS_PER_HOUR = 4
 HP_POWER = 1  # [kW] we assume normalized power
 CLIMATE_IDS = range(6)  # 0–5
-N_CORES = 16  # Number of logical CPU cores to use for parallelization
+N_CORES = 6  # Number of logical CPU cores to use for parallelization use 16
 
 # Building archetypes 
+#BUILDING_IDS = [
+#    "ep_SFH_age_0_climate_0_1241"]
 BUILDING_IDS = [
-    "ep_SFH_age_0_climate_0_1241"]
-""" ,
-    "ep_SFH_age_0_climate_0_649", "ep_SFH_age_0_climate_0_821", "ep_SFH_age_0_climate_0_1241",
+    "ep_SFH_age_0_climate_0_649", "ep_SFH_age_0_climate_0_821",]
+"""
+    "ep_SFH_age_0_climate_0_1241",
     "ep_SFH_age_0_climate_1_259", "ep_SFH_age_0_climate_1_493", "ep_SFH_age_0_climate_1_535",
     "ep_SFH_age_0_climate_2_1325", "ep_SFH_age_0_climate_2_1691", "ep_SFH_age_0_climate_2_1972",
     "ep_SFH_age_0_climate_3_955", "ep_SFH_age_0_climate_3_1081", "ep_SFH_age_0_climate_3_1123",
@@ -58,7 +60,7 @@ BUILDING_IDS = [
     "ep_SFH_age_1_climate_1_32", "ep_SFH_age_1_climate_1_429", "ep_SFH_age_1_climate_1_458",
     "ep_SFH_age_1_climate_2_762", "ep_SFH_age_1_climate_2_852", "ep_SFH_age_1_climate_2_1161",
     "ep_SFH_age_1_climate_3_260", "ep_SFH_age_1_climate_3_451", "ep_SFH_age_1_climate_3_597"
-] """
+]  """
 
 # =====================================================
 # STEP 1 — OPTIMIZATION: Run MPC and retrieve UB/LB arrays
