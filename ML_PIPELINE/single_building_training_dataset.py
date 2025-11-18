@@ -19,7 +19,7 @@ from torch.utils.tensorboard import SummaryWriter
 # CONFIGURATION
 # =====================================================
 
-BASE_DIR = "/Users/edouardpaupe/Desktop/magnify-main_DATABASE_SCALAR"
+BASE_DIR = "/Users/edouardpaupe/Desktop/Magnify_fast_flexibility_ML"
 BUILDING_NUM = 1241
 CLIMATE_IDS = range(6)  # 0–5
 
