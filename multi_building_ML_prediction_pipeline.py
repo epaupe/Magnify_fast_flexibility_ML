@@ -19,7 +19,8 @@ from torch.utils.tensorboard import SummaryWriter
 # CONFIGURATION
 # =====================================================
 
-BASE_DIR = "/Users/edouardpaupe/Desktop/Magnify_fast_flexibility_ML"
+#BASE_DIR = "/Users/edouardpaupe/Desktop/Magnify_fast_flexibility_ML"
+BASE_DIR = "C:\\Users\\palo\\magnify-main_DATABASE_SCALAR"
 CLIMATE_IDS = range(6)  # 0–5
 
 FLEX_BASE_DIR = os.path.join(BASE_DIR, "data")
@@ -27,7 +28,7 @@ STATIC_FEATURE_DIR = os.path.join(BASE_DIR, "avg_scalar_params")
 CLIMATE_DIR = os.path.join(BASE_DIR, "input_features/climate_scenarios")
 
 BATCH_SIZE   = 16
-EPOCHS       = 50
+EPOCHS       = 100
 LR           = 1e-3
 WEIGHT_DECAY = 1e-4
 SEED         = 42
@@ -531,7 +532,7 @@ def train_model(
     checkpoint saving, and TensorBoard logging (MAE + R²).
     """
 
-    writer = SummaryWriter(log_dir="runs/flexibility_cnn")
+    writer = SummaryWriter(log_dir="runs/flexibility_cnn_scalar_train_100")
 
     model = model.to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=wd)
@@ -662,7 +663,7 @@ def test_model(model, test_loader, device=DEVICE, results_dir=None):
     print(f"Average computation time: {avg_time_per_sample:.5f} s/envelope")
 
     # Log to TensorBoard
-    writer = SummaryWriter(log_dir="runs/flexibility_cnn_test")
+    writer = SummaryWriter(log_dir="runs/flexibility_cnn_scalar_test_100")
     writer.add_scalar("Test/MAE", test_loss)
     writer.add_scalar("Test/R2", r2)
     writer.add_scalar("Test/Computation_Time_s_per_envelope", avg_time_per_sample)
@@ -686,19 +687,19 @@ def test_model(model, test_loader, device=DEVICE, results_dir=None):
 def main():
     train_loader, val_loader, test_loader, clim_mean, clim_std, static_mean, static_std = get_data()
     model = FlexibilityFusionModel()
-    # model = train_model(
-    #     model,
-    #     train_loader,
-    #     val_loader,
-    #     epochs=EPOCHS,
-    #     lr=LR,
-    #     wd=WEIGHT_DECAY,
-    #     device=DEVICE,
-    #     patience=PATIENCE,
-    #     save_path="best_flex_fusion.pt",
-    # )
+    model = train_model(
+        model,
+        train_loader,
+        val_loader,
+        epochs=EPOCHS,
+        lr=LR,
+        wd=WEIGHT_DECAY,
+        device=DEVICE,
+        patience=PATIENCE,
+        save_path="best_flex_fusion.pt",
+    )
     # or: load a pre-trained model
-    model.load_state_dict(torch.load("best_flex_fusion.pt", map_location=DEVICE))
+    #model.load_state_dict(torch.load("best_flex_fusion.pt", map_location=DEVICE))
 
     # Save test predictions plots
     results_dir = os.path.join(BASE_DIR, "ML_PIPELINE", "results")
