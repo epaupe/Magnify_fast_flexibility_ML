@@ -19,17 +19,18 @@ from torch.utils.tensorboard import SummaryWriter
 # CONFIGURATION
 # =====================================================
 
+#Change BASE_DIR to your local path where the data is stored
 #BASE_DIR = "/Users/edouardpaupe/Desktop/Magnify_fast_flexibility_ML"
 BASE_DIR = "C:\\Users\\palo\\magnify-main_DATABASE_SCALAR"
 CLIMATE_IDS = range(6)  # 0–5
 
 FLEX_BASE_DIR = os.path.join(BASE_DIR, "data")
-STATIC_FEATURE_DIR = os.path.join(BASE_DIR, "avg_scalar_params")
+#STATIC_FEATURE_DIR = os.path.join(BASE_DIR, "avg_scalar_params")
 CLIMATE_DIR = os.path.join(BASE_DIR, "input_features/climate_scenarios")
 
 BATCH_SIZE   = 16
 EPOCHS       = 100
-LR           = 1e-3
+LR           = 1e-3 
 WEIGHT_DECAY = 1e-4
 SEED         = 42
 PATIENCE     = 20
@@ -283,7 +284,7 @@ def plot_weather_and_envelopes(
 # =====================================================
 # BUILD THE DATASET (single building, multiple climates)
 # =====================================================
-def get_data(base_dir=BASE_DIR,batch_size=BATCH_SIZE,seed=SEED,building_ids=BUILDING_IDS,climate_ids=CLIMATE_IDS,):
+def get_data_norm(base_dir=BASE_DIR,batch_size=BATCH_SIZE,seed=SEED,building_ids=BUILDING_IDS,climate_ids=CLIMATE_IDS,):
     """
     Loads:
         - climate time series  (4,192)
@@ -383,6 +384,167 @@ def get_data(base_dir=BASE_DIR,batch_size=BATCH_SIZE,seed=SEED,building_ids=BUIL
     test_loader  = DataLoader(test_set,  batch_size=batch_size, shuffle=False)
 
     print(f" Dataset split: {n_train_final} train | {n_val} val | {n_test} test")
+
+    return (
+        train_loader,
+        val_loader,
+        test_loader,
+        clim_mean,
+        clim_std,
+        static_mean,
+        static_std,
+    )
+
+def get_data(
+    base_dir=BASE_DIR,
+    batch_size=BATCH_SIZE,
+    seed=SEED,
+    building_ids=BUILDING_IDS,
+    climate_ids=CLIMATE_IDS,
+):
+    """
+    Loads:
+        - raw climate time series  (N,4,192)
+        - raw static features      (N,61)
+        - raw flexibility envelope (N,1,51,96)
+
+    Then:
+        1) Splits dataset BEFORE normalization  (85% train / 10% val / 5% test)
+        2) Computes normalization stats **only from the training set**
+        3) Applies normalization to train/val/test using train-set stats
+        4) Returns normalized DataLoaders and the normalization statistics
+    """
+
+    X_ts_list     = []
+    X_static_list = []
+    Y_list        = []
+
+    # ==========================================================
+    # LOAD FULL RAW DATASET (NO NORMALIZATION)
+    # ==========================================================
+    for building_id in building_ids:
+
+        building_num = int(building_id.split("_")[-1])
+        static_tensor = load_weights_and_biases(building_num, base_dir)
+
+        for clim in climate_ids:
+
+            pattern = os.path.join(
+                base_dir,
+                "input_features",
+                "climate_scenarios",
+                f"climate_{clim}",
+                f"climate{clim}_*.csv",
+            )
+            cfiles = sorted(glob.glob(pattern))
+            if not cfiles:
+                print(f"No climate files for climate {clim}")
+                continue
+
+            for cfile in cfiles:
+                _, Y, M, D = os.path.basename(cfile).replace(".csv", "").split("_")
+                year, month, day = int(Y), int(M), int(D)
+
+                result = load_climate_data(clim, year, month, day)
+                if result is None:
+                    continue
+                X_ts, _ = result
+
+                Y_env = load_flexibility_envelope(
+                    building_id=building_id,
+                    building_num=building_num,
+                    climate_id=clim,
+                    year=year,
+                    month=month,
+                    day=day,
+                    base_dir=base_dir,
+                )
+                if Y_env is None:
+                    continue
+
+                X_ts_list.append(torch.tensor(X_ts, dtype=torch.float32))       # (4,192)
+                X_static_list.append(static_tensor.clone())                     # (61,)
+                Y_list.append(torch.tensor(Y_env, dtype=torch.float32).unsqueeze(0))  # (1,51,96)
+
+    # Convert to tensors
+    X_ts_tensor     = torch.stack(X_ts_list)      # (N,4,192)
+    X_static_tensor = torch.stack(X_static_list)  # (N,61)
+    Y_tensor        = torch.stack(Y_list)         # (N,1,51,96)
+
+    print(f" Loaded dataset of length: {len(Y_tensor)} samples")
+    print(f"  Climate inputs : {X_ts_tensor.shape}")
+    print(f"  Static features: {X_static_tensor.shape}")
+    print(f"  Envelopes      : {Y_tensor.shape}")
+
+    # ==========================================================
+    # SPLIT BEFORE NORMALIZATION → AVOID DATA LEAKAGE
+    # ==========================================================
+    full_dataset = TensorDataset(X_ts_tensor, X_static_tensor, Y_tensor)
+
+    n_total = len(full_dataset)
+    n_train = int(0.85 * n_total)
+    n_test  = n_total - n_train
+
+    train_set, test_set = random_split(
+        full_dataset,
+        [n_train, n_test],
+        generator=torch.Generator().manual_seed(seed),
+    )
+
+    n_val = int(0.15 * len(train_set))  # 15% of train set
+    n_train_final = len(train_set) - n_val
+
+    train_set, val_set = random_split(
+        train_set,
+        [n_train_final, n_val],
+        generator=torch.Generator().manual_seed(seed),
+    )
+
+    print(f" Dataset split: {n_train_final} train | {n_val} val | {n_test} test")
+
+    # ==========================================================
+    # COMPUTE NORMALIZATION STATS FROM TRAINING-SET ONLY
+    # ==========================================================
+    X_ts_train_raw     = torch.stack([x[0] for x in train_set])     # (N_train,4,192)
+    X_static_train_raw = torch.stack([x[1] for x in train_set])     # (N_train,61)
+
+    clim_mean = X_ts_train_raw.mean(dim=(0, 2), keepdim=True)       # (1,4,1)
+    clim_std  = X_ts_train_raw.std(dim=(0, 2), keepdim=True)        # (1,4,1)
+
+    static_mean = X_static_train_raw.mean(dim=0, keepdim=True)      # (1,61)
+    static_std  = X_static_train_raw.std(dim=0, keepdim=True)       # (1,61)
+
+    # ==========================================================
+    # APPLY NORMALIZATION TO ALL SPLITS
+    # ==========================================================
+    def normalize_subset(dataset):
+        X_ts_norm_list = []
+        X_static_norm_list = []
+        Y_list_out = []
+
+        for ts, st, y in dataset:
+            ts_norm = (ts - clim_mean) / (clim_std + 1e-8)
+            st_norm = (st - static_mean) / (static_std + 1e-8)
+            X_ts_norm_list.append(ts_norm)
+            X_static_norm_list.append(st_norm)
+            Y_list_out.append(y)
+
+        return TensorDataset(
+            torch.stack(X_ts_norm_list),
+            torch.stack(X_static_norm_list),
+            torch.stack(Y_list_out),
+        )
+
+    train_norm = normalize_subset(train_set)
+    val_norm   = normalize_subset(val_set)
+    test_norm  = normalize_subset(test_set)
+
+    # ==========================================================
+    # BUILD DATALOADERS
+    # ==========================================================
+    train_loader = DataLoader(train_norm, batch_size=batch_size, shuffle=True)
+    val_loader   = DataLoader(val_norm,   batch_size=batch_size, shuffle=False)
+    test_loader  = DataLoader(test_norm,  batch_size=batch_size, shuffle=False)
 
     return (
         train_loader,
