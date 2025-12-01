@@ -1,0 +1,13 @@
+numpy
+pandas
+matplotlib
+scikit-learn
+torch
+torchvision
+tensorboard
+tqdm
+seaborn
+python-dateutil
+
+# Optimization solver
+gurobipy

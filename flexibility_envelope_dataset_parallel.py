@@ -8,7 +8,7 @@ time window. For each (building_id, climate_id), the script:
   3. Computes and saves flexibility envelopes + heatmaps
 
 Author: Edouard Paupe
-Date: 2025-10-20
+Date: 2025-12-01
 """
 
 import os

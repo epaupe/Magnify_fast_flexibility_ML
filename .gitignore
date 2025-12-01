@@ -1,0 +1,48 @@
+# -------------------------
+# Python cache / build files
+# -------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# -------------------------
+# Virtual environments
+# -------------------------
+venv/
+env/
+.venv/
+ENV/
+*.swp
+
+# -------------------------
+# OS / Editor files
+# -------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# -------------------------
+# Gurobi-specific files
+# -------------------------
+
+# License files (never commit these)
+gurobi.lic
+gurobi_user.lic
+gurobi_client.lic
+
+# Gurobi logs / output
+gurobi.log
+*.prm
+*.mps
+*.lp
+
+# Temp solver artifacts
+*.bas
+*.sol
+*.ilp
