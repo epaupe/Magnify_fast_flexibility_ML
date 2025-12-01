@@ -282,35 +282,91 @@ def plot_weather_and_envelopes(
 
 
 # =====================================================
-# BUILD THE DATASET (single building, multiple climates)
+# BUILD THE DATASET (multi-building, multiple climates)
 # =====================================================
-def get_data_norm(base_dir=BASE_DIR,batch_size=BATCH_SIZE,seed=SEED,building_ids=BUILDING_IDS,climate_ids=CLIMATE_IDS,):
+def get_data(
+    base_dir=BASE_DIR,
+    batch_size=BATCH_SIZE,
+    seed=SEED,
+    building_ids=BUILDING_IDS,
+    climate_ids=CLIMATE_IDS,
+    train_ratio=0.67,   # 20 buildings if you have 30
+    val_ratio=0.17,     # 5 buildings
+    test_ratio=0.17,    # 5 buildings
+):
     """
-    Loads:
-        - climate time series  (4,192)
-        - static building vector (61,)
-        - flexibility envelope (1,51,96)
-    for all buildings & climates. Then Normalizes, splits (85/10/5) → train/val/test DataLoaders.
-    """
+    NEW VERSION — GENERALIZATION TO UNSEEN BUILDINGS
 
-    X_ts_list     = []   # (4,192)
-    X_static_list = []   # (61,)
-    Y_list        = []   # (1,51,96)
+    Splits buildings into:
+        - training buildings
+        - validation buildings
+        - test buildings
+    
+    Then loads ALL samples (all days × climates) for each building into
+    the corresponding split.
+
+    Normalization:
+        - compute normalization stats ONLY from the training buildings
+        - apply those stats to val/test buildings
+
+    Returns:
+        train_loader, val_loader, test_loader,
+        clim_mean, clim_std, static_mean, static_std
+    """
 
     # ==========================================================
-    # MAIN LOADING LOOP: BLD → CLIMATE → DAY
+    # 0. PERMUTE + SPLIT BUILDINGS
+    # ==========================================================
+    rng = np.random.default_rng(seed)
+    shuffled_blds = rng.permutation(building_ids)
+
+    n_total = len(shuffled_blds)
+    n_train = int(train_ratio * n_total)
+    n_val   = int(val_ratio   * n_total)
+    n_test  = n_total - n_train - n_val
+
+    train_blds = shuffled_blds[:n_train]
+    val_blds   = shuffled_blds[n_train:n_train + n_val]
+    test_blds  = shuffled_blds[n_train + n_val:]
+
+    print("\n========= BUILDING SPLIT =========")
+    print(f"Training buildings   ({len(train_blds)}): {train_blds}")
+    print(f"Validation buildings ({len(val_blds)}): {val_blds}")
+    print(f"Testing buildings    ({len(test_blds)}): {test_blds}")
+    print("==================================\n")
+
+    # ==========================================================
+    # STORAGE FOR RAW DATA
+    # ==========================================================
+    raw_data = {
+        "train": [],
+        "val": [],
+        "test": []
+    }
+
+    # Helper: assign building to split
+    def split_of(bid):
+        if bid in train_blds: return "train"
+        if bid in val_blds:   return "val"
+        return "test"
+
+    # ==========================================================
+    # 1. LOAD DATA FOR EACH BUILDING => goes into correct split
     # ==========================================================
     for building_id in building_ids:
 
         building_num = int(building_id.split("_")[-1])
+        static_vec = load_weights_and_biases(building_num, base_dir)
 
-        # Static ARMAX coefficients (61 dim)
-        static_tensor = load_weights_and_biases(building_num, base_dir) # (61,)
+        # Which split does this building belong to?
+        target_split = split_of(building_id)
 
         for clim in climate_ids:
 
-            # Climate files for this scenario
-            pattern = os.path.join(base_dir,"input_features","climate_scenarios",f"climate_{clim}",f"climate{clim}_*.csv")
+            pattern = os.path.join(
+                base_dir, "input_features", "climate_scenarios",
+                f"climate_{clim}", f"climate{clim}_*.csv"
+            )
             cfiles = sorted(glob.glob(pattern))
             if not cfiles:
                 print(f"No climate files for climate {clim}")
@@ -321,13 +377,13 @@ def get_data_norm(base_dir=BASE_DIR,batch_size=BATCH_SIZE,seed=SEED,building_ids
                 _, Y, M, D = os.path.basename(cfile).replace(".csv", "").split("_")
                 year, month, day = int(Y), int(M), int(D)
 
-                # ----- Load climate timeseries (4,192)
+                # Load 48h climate (4×192)
                 result = load_climate_data(clim, year, month, day)
                 if result is None:
                     continue
-                X_ts, _ = result  # (4,192)
+                X_ts, _ = result
 
-                # ----- Load flexibility envelope (1,51,96)
+                # Load flexibility envelope (1×51×96)
                 Y_env = load_flexibility_envelope(
                     building_id=building_id,
                     building_num=building_num,
@@ -338,52 +394,58 @@ def get_data_norm(base_dir=BASE_DIR,batch_size=BATCH_SIZE,seed=SEED,building_ids
                 if Y_env is None:
                     continue
 
-                # Save tensors
-                X_ts_list.append(torch.tensor(X_ts, dtype=torch.float32))
-                X_static_list.append(static_tensor.clone())
-                Y_list.append(torch.tensor(Y_env, dtype=torch.float32).unsqueeze(0))
+                raw_data[target_split].append((
+                    torch.tensor(X_ts, dtype=torch.float32),         # (4,192)
+                    static_vec.clone(),                               # (61,)
+                    torch.tensor(Y_env, dtype=torch.float32).unsqueeze(0)  # (1,51,96)
+                ))
 
-    # STACK ALL DATA
-    X_ts_tensor     = torch.stack(X_ts_list)      # (N,4,192)
-    X_static_tensor = torch.stack(X_static_list)  # (N,61) there are copies of the same building static features for each climate/day, for a total of N samples.
-    Y_tensor        = torch.stack(Y_list)         # (N,1,51,96)
+    # Convert to TensorDatasets
+    train_raw = raw_data["train"]
+    val_raw   = raw_data["val"]
+    test_raw  = raw_data["test"]
 
-    print(f" Loaded dataset of length: {len(Y_tensor)} samples")
-    print(f"  Climate inputs : {X_ts_tensor.shape}")
-    print(f"  Static features: {X_static_tensor.shape}")
-    print(f"  Envelopes      : {Y_tensor.shape}")
+    print(f"Total samples loaded: train={len(train_raw)}, val={len(val_raw)}, test={len(test_raw)}")
 
-    # NORMALIZATION
+    # ==========================================================
+    # 2. COMPUTE NORMALIZATION (ONLY FROM TRAIN BUILDINGS)
+    # ==========================================================
+    X_ts_train = torch.stack([x[0] for x in train_raw])       # (N_train,4,192)
+    X_st_train = torch.stack([x[1] for x in train_raw])       # (N_train,61)
 
-    clim_mean = X_ts_tensor.mean(dim=(0, 2), keepdim=True)
-    clim_std  = X_ts_tensor.std(dim=(0, 2), keepdim=True)
-    X_ts_tensor = (X_ts_tensor - clim_mean) / (clim_std + 1e-8)
+    clim_mean = X_ts_train.mean(dim=(0, 2), keepdim=True)     # (1,4,1)
+    clim_std  = X_ts_train.std(dim=(0, 2), keepdim=True)
 
-    static_mean = X_static_tensor.mean(dim=0, keepdim=True)
-    static_std  = X_static_tensor.std(dim=0, keepdim=True)
-    X_static_tensor = (X_static_tensor - static_mean) / (static_std + 1e-8)
+    static_mean = X_st_train.mean(dim=0, keepdim=True)        # (1,61)
+    static_std  = X_st_train.std(dim=0, keepdim=True)
 
-    # TRAIN / VAL / TEST SPLIT
-    dataset = TensorDataset(X_ts_tensor, X_static_tensor, Y_tensor)
-    print(len(dataset))
-    n_total = len(dataset)
-    n_train = int(0.85 * n_total) # 85% for training
-    n_test  = n_total - n_train
+    # Prevent division by zero
+    clim_std = clim_std + 1e-8
+    static_std = static_std + 1e-8
 
-    train_set, test_set = random_split(dataset, [n_train, n_test],
-                                       generator=torch.Generator().manual_seed(seed))
+    # ==========================================================
+    # 3. NORMALIZE ALL SPLITS ACCORDING TO TRAINING STATS
+    # ==========================================================
+    def normalize_list(sample_list):
+        Xts, Xst, Y = [], [], []
+        for ts, st, y in sample_list:
+            ts_n = (ts - clim_mean) / clim_std
+            st_n = (st - static_mean) / static_std
+            Xts.append(ts_n)
+            Xst.append(st_n)
+            Y.append(y)
+        return TensorDataset(torch.stack(Xts), torch.stack(Xst), torch.stack(Y))
 
-    n_val = int(0.15 * len(train_set)) # 15% of train set for validation
-    n_train_final = len(train_set) - n_val
+    train_ds = normalize_list(train_raw)
+    val_ds   = normalize_list(val_raw)
+    test_ds  = normalize_list(test_raw)
 
-    train_set, val_set = random_split(train_set, [n_train_final, n_val],
-                                      generator=torch.Generator().manual_seed(seed))
-
-    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-    val_loader   = DataLoader(val_set,   batch_size=batch_size, shuffle=False)
-    test_loader  = DataLoader(test_set,  batch_size=batch_size, shuffle=False)
-
-    print(f" Dataset split: {n_train_final} train | {n_val} val | {n_test} test")
+    # ==========================================================
+    # 4. BUILD DATALOADERS
+    # ==========================================================
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
+    val_loader   = DataLoader(val_ds,   batch_size=batch_size, shuffle=False)
+    test_loader  = DataLoader(test_ds,  batch_size=batch_size, shuffle=False)
 
     return (
         train_loader,
@@ -395,166 +457,6 @@ def get_data_norm(base_dir=BASE_DIR,batch_size=BATCH_SIZE,seed=SEED,building_ids
         static_std,
     )
 
-def get_data(
-    base_dir=BASE_DIR,
-    batch_size=BATCH_SIZE,
-    seed=SEED,
-    building_ids=BUILDING_IDS,
-    climate_ids=CLIMATE_IDS,
-):
-    """
-    Loads:
-        - raw climate time series  (N,4,192)
-        - raw static features      (N,61)
-        - raw flexibility envelope (N,1,51,96)
-
-    Then:
-        1) Splits dataset BEFORE normalization  (85% train / 10% val / 5% test)
-        2) Computes normalization stats **only from the training set**
-        3) Applies normalization to train/val/test using train-set stats
-        4) Returns normalized DataLoaders and the normalization statistics
-    """
-
-    X_ts_list     = []
-    X_static_list = []
-    Y_list        = []
-
-    # ==========================================================
-    # LOAD FULL RAW DATASET (NO NORMALIZATION)
-    # ==========================================================
-    for building_id in building_ids:
-
-        building_num = int(building_id.split("_")[-1])
-        static_tensor = load_weights_and_biases(building_num, base_dir)
-
-        for clim in climate_ids:
-
-            pattern = os.path.join(
-                base_dir,
-                "input_features",
-                "climate_scenarios",
-                f"climate_{clim}",
-                f"climate{clim}_*.csv",
-            )
-            cfiles = sorted(glob.glob(pattern))
-            if not cfiles:
-                print(f"No climate files for climate {clim}")
-                continue
-
-            for cfile in cfiles:
-                _, Y, M, D = os.path.basename(cfile).replace(".csv", "").split("_")
-                year, month, day = int(Y), int(M), int(D)
-
-                result = load_climate_data(clim, year, month, day)
-                if result is None:
-                    continue
-                X_ts, _ = result
-
-                Y_env = load_flexibility_envelope(
-                    building_id=building_id,
-                    building_num=building_num,
-                    climate_id=clim,
-                    year=year,
-                    month=month,
-                    day=day,
-                    base_dir=base_dir,
-                )
-                if Y_env is None:
-                    continue
-
-                X_ts_list.append(torch.tensor(X_ts, dtype=torch.float32))       # (4,192)
-                X_static_list.append(static_tensor.clone())                     # (61,)
-                Y_list.append(torch.tensor(Y_env, dtype=torch.float32).unsqueeze(0))  # (1,51,96)
-
-    # Convert to tensors
-    X_ts_tensor     = torch.stack(X_ts_list)      # (N,4,192)
-    X_static_tensor = torch.stack(X_static_list)  # (N,61)
-    Y_tensor        = torch.stack(Y_list)         # (N,1,51,96)
-
-    print(f" Loaded dataset of length: {len(Y_tensor)} samples")
-    print(f"  Climate inputs : {X_ts_tensor.shape}")
-    print(f"  Static features: {X_static_tensor.shape}")
-    print(f"  Envelopes      : {Y_tensor.shape}")
-
-    # ==========================================================
-    # SPLIT BEFORE NORMALIZATION → AVOID DATA LEAKAGE
-    # ==========================================================
-    full_dataset = TensorDataset(X_ts_tensor, X_static_tensor, Y_tensor)
-
-    n_total = len(full_dataset)
-    n_train = int(0.85 * n_total)
-    n_test  = n_total - n_train
-
-    train_set, test_set = random_split(
-        full_dataset,
-        [n_train, n_test],
-        generator=torch.Generator().manual_seed(seed),
-    )
-
-    n_val = int(0.15 * len(train_set))  # 15% of train set
-    n_train_final = len(train_set) - n_val
-
-    train_set, val_set = random_split(
-        train_set,
-        [n_train_final, n_val],
-        generator=torch.Generator().manual_seed(seed),
-    )
-
-    print(f" Dataset split: {n_train_final} train | {n_val} val | {n_test} test")
-
-    # ==========================================================
-    # COMPUTE NORMALIZATION STATS FROM TRAINING-SET ONLY
-    # ==========================================================
-    X_ts_train_raw     = torch.stack([x[0] for x in train_set])     # (N_train,4,192)
-    X_static_train_raw = torch.stack([x[1] for x in train_set])     # (N_train,61)
-
-    clim_mean = X_ts_train_raw.mean(dim=(0, 2), keepdim=True)       # (1,4,1)
-    clim_std  = X_ts_train_raw.std(dim=(0, 2), keepdim=True)        # (1,4,1)
-
-    static_mean = X_static_train_raw.mean(dim=0, keepdim=True)      # (1,61)
-    static_std  = X_static_train_raw.std(dim=0, keepdim=True)       # (1,61)
-
-    # ==========================================================
-    # APPLY NORMALIZATION TO ALL SPLITS
-    # ==========================================================
-    def normalize_subset(dataset):
-        X_ts_norm_list = []
-        X_static_norm_list = []
-        Y_list_out = []
-
-        for ts, st, y in dataset:
-            ts_norm = (ts - clim_mean) / (clim_std + 1e-8)
-            st_norm = (st - static_mean) / (static_std + 1e-8)
-            X_ts_norm_list.append(ts_norm)
-            X_static_norm_list.append(st_norm)
-            Y_list_out.append(y)
-
-        return TensorDataset(
-            torch.stack(X_ts_norm_list),
-            torch.stack(X_static_norm_list),
-            torch.stack(Y_list_out),
-        )
-
-    train_norm = normalize_subset(train_set)
-    val_norm   = normalize_subset(val_set)
-    test_norm  = normalize_subset(test_set)
-
-    # ==========================================================
-    # BUILD DATALOADERS
-    # ==========================================================
-    train_loader = DataLoader(train_norm, batch_size=batch_size, shuffle=True)
-    val_loader   = DataLoader(val_norm,   batch_size=batch_size, shuffle=False)
-    test_loader  = DataLoader(test_norm,  batch_size=batch_size, shuffle=False)
-
-    return (
-        train_loader,
-        val_loader,
-        test_loader,
-        clim_mean,
-        clim_std,
-        static_mean,
-        static_std,
-    )
 
 
 # ===========================
@@ -847,57 +749,100 @@ def test_model(model, test_loader, device=DEVICE, results_dir=None):
     return test_loss, r2, avg_time_per_sample
 
 def main():
-    train_loader, val_loader, test_loader, clim_mean, clim_std, static_mean, static_std = get_data()
-    model = FlexibilityFusionModel()
-    model = train_model(
-        model,
+
+    # =====================================================
+    # 1. LOAD DATA (building-based split + leak-free normalization)
+    # =====================================================
+    (
         train_loader,
         val_loader,
+        test_loader,
+        clim_mean,
+        clim_std,
+        static_mean,
+        static_std,
+    ) = get_data()   # <- NEW building-aware version
+
+
+    # =====================================================
+    # 2. INITIALIZE MODEL
+    # =====================================================
+    model = FlexibilityFusionModel()
+    save_path = "best_flex_fusion_building_split.pt"
+
+    print("\n================ TRAINING STARTED ================")
+
+    # =====================================================
+    # 3. TRAIN MODEL ON TRAIN-BUILDINGS, VALIDATE ON VAL-BUILDINGS
+    # =====================================================
+    model = train_model(
+        model=model,
+        train_loader=train_loader,
+        val_loader=val_loader,
         epochs=EPOCHS,
         lr=LR,
         wd=WEIGHT_DECAY,
         device=DEVICE,
         patience=PATIENCE,
-        save_path="best_flex_fusion.pt",
+        save_path=save_path,
     )
-    # or: load a pre-trained model
-    #model.load_state_dict(torch.load("best_flex_fusion.pt", map_location=DEVICE))
 
-    # Save test predictions plots
-    results_dir = os.path.join(BASE_DIR, "ML_PIPELINE", "results")
+
+    # =====================================================
+    # 4. TEST MODEL ON COMPLETELY UNSEEN BUILDINGS
+    # =====================================================
+    print("\n================ TESTING ON UNSEEN BUILDINGS ================")
+
+    results_dir = os.path.join(BASE_DIR, "ML_PIPELINE", "results_building_split")
     os.makedirs(results_dir, exist_ok=True)
-    print(f"Saving test predictions to: {results_dir}")
 
-    test_model(model, test_loader, device=DEVICE, results_dir=results_dir)
+    test_loss, r2, avg_time = test_model(
+        model=model,
+        test_loader=test_loader,
+        device=DEVICE,
+        results_dir=results_dir,
+    )
+
+
+    # =====================================================
+    # 5. GENERATE VISUAL PLOTS FOR UNSEEN-BUILDING TEST SAMPLES
+    # =====================================================
+    print("\nGenerating prediction plots for unseen buildings...")
 
     model.eval()
-    with torch.no_grad():
-        sample_idx = 0  # global counter across all batches
-        for batch_idx, (X_ts_batch, X_static_batch, Y_batch) in enumerate(test_loader): #iterates over every batch in the test set
-            preds = model(X_ts_batch.to(DEVICE), X_static_batch.to(DEVICE))  # (B,1,51,96)
-            preds = torch.clamp(preds, 0, 24)  #sustainability duration limits
+    sample_idx = 0
 
-            for j in range(X_ts_batch.size(0)):  # loop over batch samples
-                X_sample = X_ts_batch[j]
+    with torch.no_grad():
+        for batch_idx, (X_ts_batch, X_static_batch, Y_batch) in enumerate(test_loader):
+
+            preds = model(X_ts_batch.to(DEVICE), X_static_batch.to(DEVICE))
+            preds = torch.clamp(preds, 0, 24)
+
+            for j in range(X_ts_batch.size(0)):
+                X_ts_sample = X_ts_batch[j]
                 Y_true = Y_batch[j]
                 Y_pred = preds[j].cpu()
 
                 plot_weather_and_envelopes(
                     pred=Y_pred,
                     truth=Y_true,
-                    input_features=X_sample,
+                    input_features=X_ts_sample,
                     means=clim_mean,
                     stds=clim_std,
-                    title=f"Flexibility Envelope Prediction of Test Sample {sample_idx} — from Test Set",
+                    title=f"[UNSEEN BUILDING] Test Sample {sample_idx}",
                     save_dir=results_dir,
-                    file_name=f"prediction{sample_idx}_test_set.png",
+                    file_name=f"unseen_building_prediction_{sample_idx}.png",
                     show=False
                 )
 
                 sample_idx += 1
 
-    print(f"✅ Saved {sample_idx} prediction plots to '{results_dir}'")
+    print(f"✅ Saved {sample_idx} plots for unseen-building predictions to: {results_dir}")
+    print("===============================================================")
+
     return None
+
+
 
 if __name__ == "__main__":
     main()

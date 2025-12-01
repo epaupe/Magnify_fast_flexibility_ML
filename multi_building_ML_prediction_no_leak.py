@@ -282,119 +282,8 @@ def plot_weather_and_envelopes(
 
 
 # =====================================================
-# BUILD THE DATASET (single building, multiple climates)
+# BUILD THE DATASET (multi-building, multiple climates)
 # =====================================================
-def get_data_norm(base_dir=BASE_DIR,batch_size=BATCH_SIZE,seed=SEED,building_ids=BUILDING_IDS,climate_ids=CLIMATE_IDS,):
-    """
-    Loads:
-        - climate time series  (4,192)
-        - static building vector (61,)
-        - flexibility envelope (1,51,96)
-    for all buildings & climates. Then Normalizes, splits (85/10/5) → train/val/test DataLoaders.
-    """
-
-    X_ts_list     = []   # (4,192)
-    X_static_list = []   # (61,)
-    Y_list        = []   # (1,51,96)
-
-    # ==========================================================
-    # MAIN LOADING LOOP: BLD → CLIMATE → DAY
-    # ==========================================================
-    for building_id in building_ids:
-
-        building_num = int(building_id.split("_")[-1])
-
-        # Static ARMAX coefficients (61 dim)
-        static_tensor = load_weights_and_biases(building_num, base_dir) # (61,)
-
-        for clim in climate_ids:
-
-            # Climate files for this scenario
-            pattern = os.path.join(base_dir,"input_features","climate_scenarios",f"climate_{clim}",f"climate{clim}_*.csv")
-            cfiles = sorted(glob.glob(pattern))
-            if not cfiles:
-                print(f"No climate files for climate {clim}")
-                continue
-
-            for cfile in cfiles:
-
-                _, Y, M, D = os.path.basename(cfile).replace(".csv", "").split("_")
-                year, month, day = int(Y), int(M), int(D)
-
-                # ----- Load climate timeseries (4,192)
-                result = load_climate_data(clim, year, month, day)
-                if result is None:
-                    continue
-                X_ts, _ = result  # (4,192)
-
-                # ----- Load flexibility envelope (1,51,96)
-                Y_env = load_flexibility_envelope(
-                    building_id=building_id,
-                    building_num=building_num,
-                    climate_id=clim,
-                    year=year, month=month, day=day,
-                    base_dir=base_dir
-                )
-                if Y_env is None:
-                    continue
-
-                # Save tensors
-                X_ts_list.append(torch.tensor(X_ts, dtype=torch.float32))
-                X_static_list.append(static_tensor.clone())
-                Y_list.append(torch.tensor(Y_env, dtype=torch.float32).unsqueeze(0))
-
-    # STACK ALL DATA
-    X_ts_tensor     = torch.stack(X_ts_list)      # (N,4,192)
-    X_static_tensor = torch.stack(X_static_list)  # (N,61) there are copies of the same building static features for each climate/day, for a total of N samples.
-    Y_tensor        = torch.stack(Y_list)         # (N,1,51,96)
-
-    print(f" Loaded dataset of length: {len(Y_tensor)} samples")
-    print(f"  Climate inputs : {X_ts_tensor.shape}")
-    print(f"  Static features: {X_static_tensor.shape}")
-    print(f"  Envelopes      : {Y_tensor.shape}")
-
-    # NORMALIZATION
-
-    clim_mean = X_ts_tensor.mean(dim=(0, 2), keepdim=True)
-    clim_std  = X_ts_tensor.std(dim=(0, 2), keepdim=True)
-    X_ts_tensor = (X_ts_tensor - clim_mean) / (clim_std + 1e-8)
-
-    static_mean = X_static_tensor.mean(dim=0, keepdim=True)
-    static_std  = X_static_tensor.std(dim=0, keepdim=True)
-    X_static_tensor = (X_static_tensor - static_mean) / (static_std + 1e-8)
-
-    # TRAIN / VAL / TEST SPLIT
-    dataset = TensorDataset(X_ts_tensor, X_static_tensor, Y_tensor)
-    print(len(dataset))
-    n_total = len(dataset)
-    n_train = int(0.85 * n_total) # 85% for training
-    n_test  = n_total - n_train
-
-    train_set, test_set = random_split(dataset, [n_train, n_test],
-                                       generator=torch.Generator().manual_seed(seed))
-
-    n_val = int(0.15 * len(train_set)) # 15% of train set for validation
-    n_train_final = len(train_set) - n_val
-
-    train_set, val_set = random_split(train_set, [n_train_final, n_val],
-                                      generator=torch.Generator().manual_seed(seed))
-
-    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-    val_loader   = DataLoader(val_set,   batch_size=batch_size, shuffle=False)
-    test_loader  = DataLoader(test_set,  batch_size=batch_size, shuffle=False)
-
-    print(f" Dataset split: {n_train_final} train | {n_val} val | {n_test} test")
-
-    return (
-        train_loader,
-        val_loader,
-        test_loader,
-        clim_mean,
-        clim_std,
-        static_mean,
-        static_std,
-    )
-
 def get_data(
     base_dir=BASE_DIR,
     batch_size=BATCH_SIZE,
@@ -847,57 +736,91 @@ def test_model(model, test_loader, device=DEVICE, results_dir=None):
     return test_loss, r2, avg_time_per_sample
 
 def main():
-    train_loader, val_loader, test_loader, clim_mean, clim_std, static_mean, static_std = get_data()
-    model = FlexibilityFusionModel()
-    model = train_model(
-        model,
+    # =====================================================
+    # 1. LOAD DATA (leak-free normalization inside get_data)
+    # =====================================================
+    (
         train_loader,
         val_loader,
+        test_loader,
+        clim_mean,
+        clim_std,
+        static_mean,
+        static_std,
+    ) = get_data()
+
+    # =====================================================
+    # 2. INITIALIZE MODEL
+    # =====================================================
+    model = FlexibilityFusionModel()   # your fusion model
+    save_path = "best_flex_fusion_CNN.pt"
+
+    # =====================================================
+    # 3. TRAIN MODEL WITH EARLY STOPPING
+    # =====================================================
+    model = train_model(
+        model=model,
+        train_loader=train_loader,
+        val_loader=val_loader,
         epochs=EPOCHS,
         lr=LR,
         wd=WEIGHT_DECAY,
         device=DEVICE,
         patience=PATIENCE,
-        save_path="best_flex_fusion.pt",
+        save_path=save_path,
     )
-    # or: load a pre-trained model
-    #model.load_state_dict(torch.load("best_flex_fusion.pt", map_location=DEVICE))
 
-    # Save test predictions plots
-    results_dir = os.path.join(BASE_DIR, "ML_PIPELINE", "results")
+    # =====================================================
+    # 4. TEST THE MODEL (MAE, R², runtime)
+    # =====================================================
+    results_dir = os.path.join(BASE_DIR, "ML_PIPELINE", "results_CNN")
     os.makedirs(results_dir, exist_ok=True)
     print(f"Saving test predictions to: {results_dir}")
 
-    test_model(model, test_loader, device=DEVICE, results_dir=results_dir)
+    test_model(
+        model=model,
+        test_loader=test_loader,
+        device=DEVICE,
+        results_dir=results_dir
+    )
+
+    # =====================================================
+    # 5. SAVE VISUAL PREDICTION PLOTS
+    # =====================================================
+    print("Generating prediction plots for the test set...")
 
     model.eval()
-    with torch.no_grad():
-        sample_idx = 0  # global counter across all batches
-        for batch_idx, (X_ts_batch, X_static_batch, Y_batch) in enumerate(test_loader): #iterates over every batch in the test set
-            preds = model(X_ts_batch.to(DEVICE), X_static_batch.to(DEVICE))  # (B,1,51,96)
-            preds = torch.clamp(preds, 0, 24)  #sustainability duration limits
+    sample_idx = 0
 
-            for j in range(X_ts_batch.size(0)):  # loop over batch samples
-                X_sample = X_ts_batch[j]
+    with torch.no_grad():
+        for batch_idx, (X_ts_batch, X_static_batch, Y_batch) in enumerate(test_loader):
+
+            preds = model(X_ts_batch.to(DEVICE), X_static_batch.to(DEVICE))
+            preds = torch.clamp(preds, 0, 24)   # physical constraint on duration
+
+            for j in range(X_ts_batch.size(0)):
+
+                X_ts_sample = X_ts_batch[j]   # normalized input features
                 Y_true = Y_batch[j]
                 Y_pred = preds[j].cpu()
 
                 plot_weather_and_envelopes(
                     pred=Y_pred,
                     truth=Y_true,
-                    input_features=X_sample,
+                    input_features=X_ts_sample,
                     means=clim_mean,
                     stds=clim_std,
-                    title=f"Flexibility Envelope Prediction of Test Sample {sample_idx} — from Test Set",
+                    title=f"Flexibility Envelope Prediction for Test Sample {sample_idx}",
                     save_dir=results_dir,
-                    file_name=f"prediction{sample_idx}_test_set.png",
-                    show=False
+                    file_name=f"prediction_{sample_idx}.png",
+                    show=False,
                 )
 
                 sample_idx += 1
 
     print(f"✅ Saved {sample_idx} prediction plots to '{results_dir}'")
     return None
+
 
 if __name__ == "__main__":
     main()
