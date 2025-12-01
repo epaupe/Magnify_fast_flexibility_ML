@@ -811,6 +811,7 @@ def main():
 
     model.eval()
     sample_idx = 0
+    max_plots = 1000   # <--- LIMIT
 
     with torch.no_grad():
         for batch_idx, (X_ts_batch, X_static_batch, Y_batch) in enumerate(test_loader):
@@ -819,6 +820,12 @@ def main():
             preds = torch.clamp(preds, 0, 24)
 
             for j in range(X_ts_batch.size(0)):
+
+                if sample_idx >= max_plots:
+                    print(f"➡️ Reached {max_plots} plots. Stopping early.")
+                    print(f"✅ Saved {max_plots} prediction plots to '{results_dir}'")
+                    return None
+                
                 X_ts_sample = X_ts_batch[j]
                 Y_true = Y_batch[j]
                 Y_pred = preds[j].cpu()
