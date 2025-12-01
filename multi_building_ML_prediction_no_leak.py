@@ -25,8 +25,11 @@ BASE_DIR = "C:\\Users\\palo\\magnify-main_DATABASE_SCALAR"
 CLIMATE_IDS = range(6)  # 0–5
 
 FLEX_BASE_DIR = os.path.join(BASE_DIR, "data")
-#STATIC_FEATURE_DIR = os.path.join(BASE_DIR, "avg_scalar_params")
 CLIMATE_DIR = os.path.join(BASE_DIR, "input_features/climate_scenarios")
+ML_OUT_DIR = os.path.join(BASE_DIR, "ML_PIPELINE")
+
+#You can change the name of the saved model here, depending on your training configuration:
+ITERATION_NAME = "best_flex_fusion_CNN"
 
 BATCH_SIZE   = 16
 EPOCHS       = 100
@@ -582,8 +585,8 @@ def train_model(
     Train the CNN with validation monitoring, early stopping,
     checkpoint saving, and TensorBoard logging (MAE + R²).
     """
-
-    writer = SummaryWriter(log_dir="runs/flexibility_cnn_scalar_train_100")
+    log_dir = os.path.join("runs", ITERATION_NAME + "_train" + str(epochs)+ "_" + time.strftime("%Y%m%d-%H%M%S"))
+    writer = SummaryWriter(log_dir=log_dir)
 
     model = model.to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=wd)
@@ -714,7 +717,8 @@ def test_model(model, test_loader, device=DEVICE, results_dir=None):
     print(f"Average computation time: {avg_time_per_sample:.5f} s/envelope")
 
     # Log to TensorBoard
-    writer = SummaryWriter(log_dir="runs/flexibility_cnn_scalar_test_100")
+    log_dir = os.path.join("runs", ITERATION_NAME + "_test_" + time.strftime("%Y%m%d-%H%M%S"))
+    writer = SummaryWriter(log_dir=log_dir)
     writer.add_scalar("Test/MAE", test_loss)
     writer.add_scalar("Test/R2", r2)
     writer.add_scalar("Test/Computation_Time_s_per_envelope", avg_time_per_sample)
@@ -753,7 +757,8 @@ def main():
     # 2. INITIALIZE MODEL
     # =====================================================
     model = FlexibilityFusionModel()   # your fusion model
-    save_path = "best_flex_fusion_CNN.pt"
+    save_path = ITERATION_NAME + ".pt"
+    save_path = os.path.join(ML_OUT_DIR, save_path)
 
     # =====================================================
     # 3. TRAIN MODEL WITH EARLY STOPPING
@@ -773,7 +778,8 @@ def main():
     # =====================================================
     # 4. TEST THE MODEL (MAE, R², runtime)
     # =====================================================
-    results_dir = os.path.join(BASE_DIR, "ML_PIPELINE", "results_CNN")
+    results_dir = f"results_{ITERATION_NAME}_{time.strftime('%Y%m%d-%H%M%S')}"
+    results_dir = os.path.join(ML_OUT_DIR, results_dir)
     os.makedirs(results_dir, exist_ok=True)
     print(f"Saving test predictions to: {results_dir}")
 

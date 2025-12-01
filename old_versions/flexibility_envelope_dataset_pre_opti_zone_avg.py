@@ -8,7 +8,7 @@ time window. For each (building_id, climate_id), the script:
   3. Computes and saves flexibility envelopes + heatmaps
 
 Author: Edouard Paupe
-Date: 2025-10-20
+Date: 2025-12-01
 """
 
 import os
@@ -26,8 +26,8 @@ from src.agents_scalar import MPCScalar, RB
 # =====================================================
 # CONFIGURATION
 # =====================================================
-
-BASE_DIR = "/Users/edouardpaupe/Desktop/magnify-main_DATABASE_SCALAR"
+# Change this to your local database path!
+BASE_DIR = "/Users/edouardpaupe/Desktop/Magnify_fast_flexibility_ML"  
 POWER_BOUNDS_DIR = os.path.join(BASE_DIR, "data/power_bounds/")
 
 START_TIME = datetime.datetime(2020, 1, 2, 0, 0, 0)

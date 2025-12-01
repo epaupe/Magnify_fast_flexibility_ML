@@ -328,7 +328,7 @@ def process_power_bounds(power_bounds_dir, flex_env_dir, image_dir):
 
     print("All flexibility envelopes processed successfully!")
 
-def plot_energy_bounds_from_file(building_num, climate_id, day, month, year, ep_idx, power_bounds_dir, steps_per_hour):
+def plot_energy_bounds_from_file_old(building_num, climate_id, day, month, year, ep_idx, power_bounds_dir, steps_per_hour):
     """
     Plot UB/LB energy bounds for a given episode from saved power bound files.
     
@@ -412,4 +412,103 @@ def plot_energy_bounds_from_file(building_num, climate_id, day, month, year, ep_
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
     
+    return fig, ax
+
+def plot_energy_bounds_from_file(
+    building_id,
+    building_num,
+    climate_id,
+    year,
+    month,
+    day,
+    ep_idx,
+    base_dir,
+    steps_per_hour=4
+):
+    """
+    Plot UB/LB energy bounds when power bounds are stored in:
+
+        base_dir/data/building_{BUILDING_ID}/power_bounds/
+    """
+
+    # -----------------------------------------------------
+    # 1. Correct folder path
+    # -----------------------------------------------------
+    power_bounds_dir = os.path.join(
+        base_dir,
+        "data",
+        f"building_{building_id}",   # <-- IMPORTANT UPDATE
+        "power_bounds"
+    )
+
+    if not os.path.exists(power_bounds_dir):
+        raise FileNotFoundError(
+            f"Power bounds directory does not exist:\n{power_bounds_dir}"
+        )
+
+    # -----------------------------------------------------
+    # 2. New filename pattern
+    # -----------------------------------------------------
+    ub_name = f"build{building_num}_clim{climate_id}_{year}_{month:02d}_{day:02d}_UB.npy"
+    lb_name = f"build{building_num}_clim{climate_id}_{year}_{month:02d}_{day:02d}_LB.npy"
+
+    ub_path = os.path.join(power_bounds_dir, ub_name)
+    lb_path = os.path.join(power_bounds_dir, lb_name)
+
+    # -----------------------------------------------------
+    # 3. Load and validate files
+    # -----------------------------------------------------
+    if not os.path.exists(ub_path):
+        raise FileNotFoundError(f"Upper bound file not found:\n{ub_path}")
+
+    if not os.path.exists(lb_path):
+        raise FileNotFoundError(f"Lower bound file not found:\n{lb_path}")
+
+    try:
+        ub = np.load(ub_path)
+        lb = np.load(lb_path)
+    except Exception as e:
+        raise ValueError(f"Error loading UB/LB files: {e}")
+
+    if ub.shape != lb.shape:
+        raise ValueError(f"UB/LB shape mismatch: {ub.shape} vs {lb.shape}")
+
+    # -----------------------------------------------------
+    # 4. Extract a specific episode
+    # -----------------------------------------------------
+    n_episodes, horizon_length = ub.shape
+    if not (0 <= ep_idx < n_episodes):
+        raise IndexError(f"ep_idx {ep_idx} out of range [0, {n_episodes - 1}]")
+
+    ub_ep = ub[ep_idx, :]
+    lb_ep = lb[ep_idx, :]
+
+    # Compute cumulative energy
+    dt_h = 1.0 / steps_per_hour
+    E_upper = np.cumsum(ub_ep) * dt_h
+    E_lower = np.cumsum(lb_ep) * dt_h
+    t_hours = np.arange(horizon_length) * dt_h
+
+    # -----------------------------------------------------
+    # 5. Plot
+    # -----------------------------------------------------
+    fig, ax = plt.subplots(figsize=(8, 4))
+
+    ax.plot(t_hours, E_upper, label="E_upper (kWh)", linewidth=2)
+    ax.plot(t_hours, E_lower, label="E_lower (kWh)", linewidth=2)
+
+    ax.axhline(0, color="k", linewidth=0.8, alpha=0.6)
+
+    ax.set_xlabel("Lead time [h]")
+    ax.set_ylabel("Cumulative energy [kWh]")
+
+    ax.set_title(
+        f"Energy Bounds — Episode {ep_idx}\n"
+        f"{building_id} | Climate {climate_id} | {year}-{month:02d}-{day:02d}"
+    )
+
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+
     return fig, ax

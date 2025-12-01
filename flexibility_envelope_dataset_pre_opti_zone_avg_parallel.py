@@ -33,7 +33,9 @@ from src.agents_scalar import MPCScalar, RB
 # CONFIGURATION
 # =====================================================
 
+# Change this to your local database path! 
 BASE_DIR = r"C:\Users\palo\magnify-main_DATABASE_SCALAR"
+
 
 START_TIME = datetime.datetime(2020, 1, 2, 0, 0, 0)
 END_TIME   = datetime.datetime(2020, 12, 29, 0, 0, 0)
