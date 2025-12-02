@@ -32,7 +32,7 @@ ML_OUT_DIR = os.path.join(BASE_DIR, "ML_PIPELINE")
 ITERATION_NAME = "best_flex_fusion_gen_unseen_buildings"
 
 BATCH_SIZE   = 16
-EPOCHS       = 200
+EPOCHS       = 150
 LR           = 1e-3 
 WEIGHT_DECAY = 1e-4
 SEED         = 42
@@ -43,8 +43,7 @@ BUILDING_IDS = [
 "ep_SFH_age_0_climate_0_1241","ep_SFH_age_0_climate_0_649", "ep_SFH_age_0_climate_0_821","ep_SFH_age_0_climate_1_259", "ep_SFH_age_0_climate_1_493", "ep_SFH_age_0_climate_1_535",
 "ep_SFH_age_0_climate_2_1325", "ep_SFH_age_0_climate_2_1691", "ep_SFH_age_0_climate_2_1972",
 "ep_SFH_age_0_climate_3_955","ep_SFH_age_0_climate_3_1081", "ep_SFH_age_0_climate_3_1123","ep_SFH_age_0_climate_4_1072",
-"ep_SFH_age_0_climate_4_1688", "ep_SFH_age_0_climate_4_1709",
-"ep_SFH_age_0_climate_5_417", "ep_SFH_age_0_climate_5_758", "ep_SFH_age_0_climate_5_928",
+"ep_SFH_age_0_climate_4_1688", "ep_SFH_age_0_climate_4_1709","ep_SFH_age_0_climate_5_417", "ep_SFH_age_0_climate_5_758", "ep_SFH_age_0_climate_5_928",
 "ep_SFH_age_1_climate_0_42", "ep_SFH_age_1_climate_0_168", "ep_SFH_age_1_climate_0_249",
 "ep_SFH_age_1_climate_1_32","ep_SFH_age_1_climate_1_429", "ep_SFH_age_1_climate_1_458",
 "ep_SFH_age_1_climate_2_762", "ep_SFH_age_1_climate_2_852", "ep_SFH_age_1_climate_2_1161",
