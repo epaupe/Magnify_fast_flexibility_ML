@@ -1,4 +1,4 @@
-# **Machine learning Assisted larGe scale quaNtIfication of building energy FlexibilitY**
+# **Machine Learning-Assisted Large Scale Quantification of Building Energy Flexibility**
 **MAGNIFY: Data-Driven Demand-Side Flexibility Quantification**
 
 ---
@@ -11,6 +11,9 @@ This repository provides a complete computational framework to **quantify and pr
 - A deep-learning ML pipeline (PyTorch), with a complete CNN+MLP multi-modal architecture that predicts complete flexibility envelopes in real time from weather forecasts and building parameters.
 
 The goal is to replace slow, repeated optimization with a single-shot ML prediction, enabling scalable real-time flexibility quantification for grid-aware control and flexibility markets.
+
+## **Output Example**
+![Expected result of ML model output on test set](ML_PIPELINE/prediction_example.png)
 
 ---
 
