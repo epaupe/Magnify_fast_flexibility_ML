@@ -460,7 +460,7 @@ def get_data(
     val_norm   = normalize_subset(val_set)
     test_norm  = normalize_subset(test_set)
 
-    print("✔ Shape check:")
+    print("Shape check:")
     print("Train climate:", train_norm[0][0].shape)
     print("Train static:", train_norm[0][1].shape)
     print("Train envelope:", train_norm[0][2].shape)
@@ -486,52 +486,6 @@ def get_data(
 # ===========================
 # MODEL
 # ===========================
-class FlexibilityCNN(nn.Module):
-    """
-    (B,4,192) -> (B,1,51,96)
-    1D temporal encoder -> FC bridge to small 2D latent -> 2D upsampling decoder
-    """
-    def __init__(self):
-        super().__init__()
-
-        # 1D TEMPORAL ENCODER (extract weather feature
-        self.encoder = nn.Sequential(
-            nn.Conv1d(4, 32, kernel_size=5, padding=2),  # (B,32,192)
-            nn.ReLU(),
-            nn.Conv1d(32, 64, kernel_size=5, padding=2), # (B,64,192)
-            nn.ReLU(),
-            nn.MaxPool1d(2),                             # (B,64,96)
-            nn.Conv1d(64, 128, kernel_size=3, padding=1),# (B,128,96)
-            nn.ReLU(),
-            nn.Conv1d(128, 128, kernel_size=3, padding=1),# (B,128,96)
-            nn.ReLU(),
-            nn.MaxPool1d(2),                             # (B,128,48)
-        )
-
-        # LATENT PROJECTION (1D → 2D embedding)
-        self.fc = nn.Linear(128 * 48, 256 * 12)         # (B, 3072)
-        
-        # 2D DECODER: upsample to ~ (52,96), then trim to (51,96) in the forward pass
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(256, 128, kernel_size=5, stride=4, padding=1), # (≈13,24)
-            nn.ReLU(),
-            nn.ConvTranspose2d(128, 64,  kernel_size=4, stride=2, padding=1), # (≈26,48)
-            nn.ReLU(),
-            nn.ConvTranspose2d(64,  32,  kernel_size=4, stride=2, padding=1), # (≈52,96)
-            nn.ReLU(),
-            nn.Conv2d(32, 1, kernel_size=3, padding=1)                         # (≈52,96)
-        )
-
-    def forward(self, x):
-        x = self.encoder(x)                 # (B,128,48)
-        x = x.view(x.size(0), -1)           # (B, 6144), flatten
-        x = self.fc(x)                      # (B, 3072)
-        x = x.view(x.size(0), 256, 3, 4)    # (B,256,3,4)
-        x = self.decoder(x)                 # (B,1,~52,96)
-        x = F.interpolate(x, size=(51, 96), mode='bilinear', align_corners=False) #final interpolation step to (51,96)
-        #    x = torch.clamp(x, 0, 24) #sustainability duration limits
-        return x
-
 class FlexibilityFusionModel(nn.Module):
     """
     CNN (time-series) + MLP (static building ARMAX coefficients)
