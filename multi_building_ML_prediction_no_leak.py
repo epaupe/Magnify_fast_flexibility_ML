@@ -29,10 +29,10 @@ CLIMATE_DIR = os.path.join(BASE_DIR, "input_features/climate_scenarios")
 ML_OUT_DIR = os.path.join(BASE_DIR, "ML_PIPELINE")
 
 #You can change the name of the saved model here, depending on your training configuration:
-ITERATION_NAME = "best_flex_fusion_CNN"
+ITERATION_NAME = "best_flex_fusion_CNN_MLP"
 
 BATCH_SIZE   = 16
-EPOCHS       = 100
+EPOCHS       = 200
 LR           = 1e-3 
 WEIGHT_DECAY = 1e-4
 SEED         = 42
@@ -374,7 +374,7 @@ def get_data(
     full_dataset = TensorDataset(X_ts_tensor, X_static_tensor, Y_tensor)
 
     n_total = len(full_dataset)
-    n_train = int(0.85 * n_total)
+    n_train = int(0.90 * n_total)
     n_test  = n_total - n_train
 
     train_set, test_set = random_split(
@@ -383,7 +383,7 @@ def get_data(
         generator=torch.Generator().manual_seed(seed),
     )
 
-    n_val = int(0.15 * len(train_set))  # 15% of train set
+    n_val = int(0.1 * len(train_set))  # 10% of train set
     n_train_final = len(train_set) - n_val
 
     train_set, val_set = random_split(
@@ -394,42 +394,76 @@ def get_data(
 
     print(f" Dataset split: {n_train_final} train | {n_val} val | {n_test} test")
 
+  # ==========================================================
+    # NORMALIZATION STATS FROM TRAINING SET ONLY
     # ==========================================================
-    # COMPUTE NORMALIZATION STATS FROM TRAINING-SET ONLY
+    # Extract raw tensors from train set
+    X_ts_train_raw = torch.stack([ts for ts, _, _ in train_set])       # (N_train,4,192)
+    X_static_train_raw = torch.stack([st for _, st, _ in train_set])   # (N_train,61)
+
+    # Climate normalization (same as before)
+    clim_mean = X_ts_train_raw.mean(dim=(0, 2), keepdim=True)  # (1,4,1)
+    clim_std  = X_ts_train_raw.std(dim=(0, 2), keepdim=True)   # (1,4,1)
+
+    # Static normalization (same as before)
+    static_mean = X_static_train_raw.mean(dim=0, keepdim=True) # (1,61)
+    static_std  = X_static_train_raw.std(dim=0, keepdim=True)  # (1,61)
+
+    clim_std += 1e-8
+    static_std += 1e-8
+
     # ==========================================================
-    X_ts_train_raw     = torch.stack([x[0] for x in train_set])     # (N_train,4,192)
-    X_static_train_raw = torch.stack([x[1] for x in train_set])     # (N_train,61)
+    # APPLY NORMALIZATION (WITH SHAPE FIX)
+    # =========================================================
+    def normalize_subset(subset):
+        """
+        Applies leak-free normalization and enforces correct shapes for:
+            ts: (4,192)
+            st: (61,)
+            y:  (1,51,96)
+        """
+        Xts_list = []
+        Xst_list = []
+        Y_list2 = []
 
-    clim_mean = X_ts_train_raw.mean(dim=(0, 2), keepdim=True)       # (1,4,1)
-    clim_std  = X_ts_train_raw.std(dim=(0, 2), keepdim=True)        # (1,4,1)
+        parent_dataset = subset.dataset   # underlying TensorDataset
 
-    static_mean = X_static_train_raw.mean(dim=0, keepdim=True)      # (1,61)
-    static_std  = X_static_train_raw.std(dim=0, keepdim=True)       # (1,61)
+        for idx in subset.indices:        # iterate over indices in the Subset
 
-    # ==========================================================
-    # APPLY NORMALIZATION TO ALL SPLITS
-    # ==========================================================
-    def normalize_subset(dataset):
-        X_ts_norm_list = []
-        X_static_norm_list = []
-        Y_list_out = []
+            ts, st, y = parent_dataset[idx]
 
-        for ts, st, y in dataset:
-            ts_norm = (ts - clim_mean) / (clim_std + 1e-8)
-            st_norm = (st - static_mean) / (static_std + 1e-8)
-            X_ts_norm_list.append(ts_norm)
-            X_static_norm_list.append(st_norm)
-            Y_list_out.append(y)
+            # ---- enforce shapes ----
+            ts = ts.view(4, 192)
+            st = st.view(61)
+            y  = y.view(1, 51, 96)
+
+            # ---- normalization ----
+            clim_mean_2d = clim_mean.view(4, 1)
+            clim_std_2d  = clim_std.view(4, 1)
+            ts_norm = (ts - clim_mean_2d) / clim_std_2d
+
+            static_mean_1d = static_mean.view(61)
+            static_std_1d  = static_std.view(61)
+            st_norm = (st - static_mean_1d) / static_std_1d
+
+            Xts_list.append(ts_norm)
+            Xst_list.append(st_norm)
+            Y_list2.append(y)
 
         return TensorDataset(
-            torch.stack(X_ts_norm_list),
-            torch.stack(X_static_norm_list),
-            torch.stack(Y_list_out),
+            torch.stack(Xts_list),
+            torch.stack(Xst_list),
+            torch.stack(Y_list2),
         )
 
     train_norm = normalize_subset(train_set)
     val_norm   = normalize_subset(val_set)
     test_norm  = normalize_subset(test_set)
+
+    print("✔ Shape check:")
+    print("Train climate:", train_norm[0][0].shape)
+    print("Train static:", train_norm[0][1].shape)
+    print("Train envelope:", train_norm[0][2].shape)
 
     # ==========================================================
     # BUILD DATALOADERS
@@ -808,7 +842,7 @@ def main():
             for j in range(X_ts_batch.size(0)):
 
                 if sample_idx >= max_plots:
-                    print(f"➡️ Reached {max_plots} plots. Stopping early.")
+                    print(f" Reached {max_plots} plots. Stopping early.")
                     print(f"✅ Saved {max_plots} prediction plots to '{results_dir}'")
                     return None
 
