@@ -220,4 +220,10 @@ More info is available in the dedicated README.md file.
 
 # Authors and acknowledgment
 
+Edouard Paupe
+Master’s student in Energy Science & Technology (ETH Zürich)
+Developer of the machine-learning framework, data pipelines, and multi-building flexibility-quantification models.
+
+I would like to express my sincere gratitude to Dr. Mina Montazeri from EMPA’s Urban Energy Systems Laboratory for her continuous guidance, support, and scientific insights throughout this project.
+I am also very thankful to Julie Rousseau from EMPA’s UESL for her valuable feedback, discussions, and assistance, which greatly contributed to the development and refinement of this work.
 
