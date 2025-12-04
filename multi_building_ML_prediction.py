@@ -301,7 +301,7 @@ def get_data(
         - raw flexibility envelope (N,1,51,96)
 
     Then:
-        1) Splits dataset BEFORE normalization  (85% train / 10% val / 5% test)
+        1) Splits dataset BEFORE normalization  (81% train / 9% val / 10% test)
         2) Computes normalization stats **only from the training set**
         3) Applies normalization to train/val/test using train-set stats
         4) Returns normalized DataLoaders and the normalization statistics

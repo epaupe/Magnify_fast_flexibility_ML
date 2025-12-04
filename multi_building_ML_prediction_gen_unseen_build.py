@@ -29,14 +29,14 @@ CLIMATE_DIR = os.path.join(BASE_DIR, "input_features/climate_scenarios")
 ML_OUT_DIR = os.path.join(BASE_DIR, "ML_PIPELINE")
 
 #You can change the name of the saved model here, depending on your training configuration:
-ITERATION_NAME = "best_flex_fusion_gen_unseen_buildings"
+ITERATION_NAME = "unseen_buildings_high_patience"
 
 BATCH_SIZE   = 16
 EPOCHS       = 150
 LR           = 1e-3 
 WEIGHT_DECAY = 1e-4
 SEED         = 42
-PATIENCE     = 20
+PATIENCE     = 50
 DEVICE       = "cuda" if torch.cuda.is_available() else "cpu"
 
 BUILDING_IDS = [
@@ -314,7 +314,7 @@ def get_data(
 
     n_total = len(shuffled)
     n_train_b = int(0.70 * n_total)
-    n_val_b   = int(0.15 * n_total)
+    n_val_b   = int(0.20 * n_total)
     n_test_b  = n_total - n_train_b - n_val_b
 
     train_buildings = shuffled[:n_train_b]
