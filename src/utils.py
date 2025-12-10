@@ -28,7 +28,7 @@ def get_list_of_buildings(models_dir): #parses building folder names to create a
 
 def load_armax_model(building_folder_path: str, 
                         steps_per_hour: int = 4,
-                        lag_hours_list:  list = [0.5, 1, 2, 8],
+                        lag_hours_list:  list = [6/12, 9/12, 1, 2, 4, 8],
                         solar_terms: int = 9) -> Dict:
     '''
     Load ARMAX model parameters. Each building has 10 models calibrated for 
@@ -64,7 +64,7 @@ def load_armax_model(building_folder_path: str,
     pos_s1 = param_names.get_loc('s1')        # Position of first solar bin
 
     # Validate lag hours: only allow 0.5, 1, 2, 8 hours
-    if not all(lag in [0.5, 1, 2, 8] for lag in lag_hours_list):
+    if not all(lag in [6/12, 9/12, 1, 2, 4, 8] for lag in lag_hours_list):
         raise ValueError(
                 f'Invalid lag hours in {lag_hours_list}. Only 0.5, 1, 2, 8 are allowed.')
     lag_hours_list = np.array(lag_hours_list)
