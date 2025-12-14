@@ -1,0 +1,6 @@
+Test Set Evaluation Metrics
+===========================
+Test MAE [h]: 0.30969
+Test MAE [min]: 18.58
+Test R²: 0.96635
+Avg Computation Time [s/envelope]: 0.00007
