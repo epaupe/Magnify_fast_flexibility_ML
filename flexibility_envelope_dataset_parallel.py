@@ -38,47 +38,64 @@ BASE_DIR = r"C:\Users\palo\magnify-main_DATABASE_SCALAR"
 
 
 START_TIME = datetime.datetime(2020, 1, 2, 0, 0, 0)
-END_TIME   = datetime.datetime(2020, 2, 2, 0, 0, 0)
+END_TIME   = datetime.datetime(2020, 12, 29, 0, 0, 0)
 HISTORY_HOURS = 8
 HORIZON_HOURS = 24
 STEPS_PER_HOUR = 4
 HP_POWER = 1  # [kW] we assume normalized power
 CLIMATE_IDS = range(6)  # 0–5
-N_CORES = 6  # Number of logical CPU cores to use for parallelization use 16
+N_CORES = 18  # Number of logical CPU cores to use for parallelization use 16
 
 # Building archetypes 
-# BUILDING_IDS = [
-# "ep_SFH_age_0_climate_0_1241",
-# "ep_SFH_age_0_climate_0_649", "ep_SFH_age_0_climate_0_821","ep_SFH_age_0_climate_1_259", "ep_SFH_age_0_climate_1_493", "ep_SFH_age_0_climate_1_535",
-# "ep_SFH_age_0_climate_2_1325", "ep_SFH_age_0_climate_2_1691", "ep_SFH_age_0_climate_2_1972",
-# "ep_SFH_age_0_climate_3_955","ep_SFH_age_0_climate_3_1081", "ep_SFH_age_0_climate_3_1123","ep_SFH_age_0_climate_4_1072",
-# "ep_SFH_age_0_climate_4_1688", "ep_SFH_age_0_climate_4_1709",
-# "ep_SFH_age_0_climate_5_417", "ep_SFH_age_0_climate_5_758", "ep_SFH_age_0_climate_5_928",
-# "ep_SFH_age_1_climate_0_42", "ep_SFH_age_1_climate_0_168", "ep_SFH_age_1_climate_0_249",
-# "ep_SFH_age_1_climate_1_32","ep_SFH_age_1_climate_1_429", "ep_SFH_age_1_climate_1_458",
-# "ep_SFH_age_1_climate_2_762", "ep_SFH_age_1_climate_2_852", "ep_SFH_age_1_climate_2_1161",
-# "ep_SFH_age_1_climate_3_260", "ep_SFH_age_1_climate_3_451", "ep_SFH_age_1_climate_3_597"
-# ] 
+BUILDING_IDS = [
+"ep_SFH_age_0_climate_0_1241",
+"ep_SFH_age_0_climate_0_649",
+"ep_SFH_age_0_climate_0_821",
+"ep_SFH_age_0_climate_1_259",
+"ep_SFH_age_0_climate_1_493",
+"ep_SFH_age_0_climate_1_535",
+"ep_SFH_age_0_climate_2_1325",
+"ep_SFH_age_0_climate_2_1691",
+"ep_SFH_age_0_climate_2_1972",
+"ep_SFH_age_0_climate_3_955",
+"ep_SFH_age_0_climate_3_1081",
+"ep_SFH_age_0_climate_3_1123",
+"ep_SFH_age_0_climate_4_1072",
+"ep_SFH_age_0_climate_4_1688",
+"ep_SFH_age_0_climate_4_1709",
+"ep_SFH_age_0_climate_5_417",
+"ep_SFH_age_0_climate_5_758",
+"ep_SFH_age_0_climate_5_928",
+"ep_SFH_age_1_climate_0_42",
+"ep_SFH_age_1_climate_0_168",
+"ep_SFH_age_1_climate_0_249",
+"ep_SFH_age_1_climate_1_32",
+"ep_SFH_age_1_climate_2_762",
+"ep_SFH_age_1_climate_2_852",
+"ep_SFH_age_1_climate_2_1161",
+"ep_SFH_age_1_climate_3_260",]
 
+
+#"ep_SFH_age_1_climate_3_451","ep_SFH_age_1_climate_3_597","ep_SFH_age_1_climate_1_429","ep_SFH_age_1_climate_1_458"
 #new_buildings
 #BUILDING_IDS = [
-    # Age 0 - Climate 0
-    #"ep_SFH_age_0_climate_0_1313", #bug, empty envelopes
-    #"ep_SFH_age_0_climate_0_1528", #bug, empty envelopes
-    # "ep_SFH_age_0_climate_0_2571", #empty envelopes
-    # "ep_SFH_age_0_climate_0_2852",#empty envelopes
-    # "ep_SFH_age_0_climate_0_3991",#empty envelopes
-    # "ep_SFH_age_0_climate_0_4717",# weird but works
-    # "ep_SFH_age_0_climate_0_6144",#empty envelopes
+    #Age 0 - Climate 0
+    # "ep_SFH_age_0_climate_0_1313", 
+    # "ep_SFH_age_0_climate_0_1528", 
+    # "ep_SFH_age_0_climate_0_2571", 
+    # "ep_SFH_age_0_climate_0_2852",
+    # "ep_SFH_age_0_climate_0_3991",
+    # "ep_SFH_age_0_climate_0_4717",
+    # "ep_SFH_age_0_climate_0_6144",
 
     # # Age 0 - Climate 1
-    # "ep_SFH_age_0_climate_1_566", #empty envelopes
-    # "ep_SFH_age_0_climate_1_1377",#empty envelopes
-    # "ep_SFH_age_0_climate_1_1482", #empty envelopes
-    # "ep_SFH_age_0_climate_1_1515",#empty envelopes
-    # "ep_SFH_age_0_climate_1_1866",#empty envelopes
-    # "ep_SFH_age_0_climate_1_2325", #empty envelopes
-    # "ep_SFH_age_0_climate_1_2701",] #empty envelopes, 
+    # "ep_SFH_age_0_climate_1_566", 
+    # "ep_SFH_age_0_climate_1_1377",
+    # "ep_SFH_age_0_climate_1_1482", 
+    # "ep_SFH_age_0_climate_1_1515",
+    # "ep_SFH_age_0_climate_1_1866",
+    # "ep_SFH_age_0_climate_1_2325", 
+    # "ep_SFH_age_0_climate_1_2701",
 
     # # Age 0 - Climate 2
     # "ep_SFH_age_0_climate_2_65",
@@ -98,20 +115,20 @@ N_CORES = 6  # Number of logical CPU cores to use for parallelization use 16
     # "ep_SFH_age_0_climate_3_4047",
     # "ep_SFH_age_0_climate_3_4215",
 
-#     # Age 0 - Climate 4
-#     "ep_SFH_age_0_climate_4_2155", #blank envelopes
-#     "ep_SFH_age_0_climate_4_3344", #works but weird envelopes
-#     "ep_SFH_age_0_climate_4_3470", #blank envelopes
-#     "ep_SFH_age_0_climate_4_4111", #blank envelopes
-#     "ep_SFH_age_0_climate_4_4325", #blank envelopes
-#     "ep_SFH_age_0_climate_4_4409", #blank envelopes
-#     "ep_SFH_age_0_climate_4_5146", #blank envelopes
+    # # Age 0 - Climate 4
+    # "ep_SFH_age_0_climate_4_2155", 
+    # "ep_SFH_age_0_climate_4_3344", 
+    # "ep_SFH_age_0_climate_4_3470", 
+    # "ep_SFH_age_0_climate_4_4111", 
+    # "ep_SFH_age_0_climate_4_4325", 
+    # "ep_SFH_age_0_climate_4_4409", 
+    # "ep_SFH_age_0_climate_4_5146", 
 
-#     # Age 0 - Climate 5
-#     "ep_SFH_age_0_climate_5_1289",
-#     "ep_SFH_age_0_climate_5_1452",
-#     "ep_SFH_age_0_climate_5_1469",
-#     "ep_SFH_age_0_climate_5_1710",
+    # # Age 0 - Climate 5
+    # "ep_SFH_age_0_climate_5_1289",
+    # "ep_SFH_age_0_climate_5_1452",
+    # "ep_SFH_age_0_climate_5_1469",
+    # "ep_SFH_age_0_climate_5_1710",
 #     "ep_SFH_age_0_climate_5_1991",
 #     "ep_SFH_age_0_climate_5_2167",
 #     "ep_SFH_age_0_climate_5_3951",

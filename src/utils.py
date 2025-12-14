@@ -37,7 +37,7 @@ def load_armax_model(building_folder_path: str,
     Args:
         building_folder_path: Path to building archetype folder
         steps_per_hour: Time discretization (4 = 15min steps)
-        lag_hours_list: Custom lag hours (default: [0.5, 1, 2, 8])
+        lag_hours_list: Custom lag hours !! Make sure they match the archetypes weight format!
         lag hours are used to compute lag terms in the ARMAX model.
         solar_terms: Number of solar irradiance terms
         
@@ -63,10 +63,10 @@ def load_armax_model(building_folder_path: str,
     pos_T_amb = param_names.get_loc('T_amb')  # Position of ambient temperature
     pos_s1 = param_names.get_loc('s1')        # Position of first solar bin
 
-    # Validate lag hours: only allow 0.5, 1, 2, 8 hours
+    # Validate lag hours: only allow 6/12, 9/12, 1, 2, 4, 8 hours
     if not all(lag in [6/12, 9/12, 1, 2, 4, 8] for lag in lag_hours_list):
         raise ValueError(
-                f'Invalid lag hours in {lag_hours_list}. Only 0.5, 1, 2, 8 are allowed.')
+                f'Invalid lag hours in {lag_hours_list}. Only 6/12, 9/12, 1, 2, 4, 8 are allowed.')
     lag_hours_list = np.array(lag_hours_list)
     # Convert lag hours to number of time steps (e.g., 0.5h * 4 steps/h = 2 steps)
     lag_terms_list = (lag_hours_list * steps_per_hour).astype(int).tolist()
