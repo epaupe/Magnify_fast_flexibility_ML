@@ -389,9 +389,9 @@ def get_data(
     ----------------------------------
     Instead of sample-level random splits (which leak building identity),
     we split the BUILDING_IDS list into:
-        - 70% buildings → training
-        - 15% buildings → validation
-        - 15% buildings → testing
+        - 75% buildings → training
+        - 12% buildings → validation
+        - 13% buildings → testing
 
     All climate-days from a building belong to the same split.
     Normalization statistics are computed ONLY from training buildings.
