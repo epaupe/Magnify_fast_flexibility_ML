@@ -318,6 +318,28 @@ More info is available in the dedicated README.md file.
 
 ---
 
+# **5. Repository Data Availability**
+
+Due to **GitLab repository memory limitations**, several large folders are **not tracked** in this repository and have been explicitly ignored.
+
+The following directories are **not included** in the GitLab repository:
+- `armax_models`
+- `data`
+- `ML_pipeline`
+
+These folders are required to fully reproduce the experiments, retrain the models, or rerun the prediction pipelines.
+
+---
+
+## **Manual Download Required**
+
+All omitted folders are available for manual download via the following Polybox link:
+
+https://polybox.ethz.ch/index.php/s/XDBd2mt8YBZzKsS
+
+After downloading, the folders must be placed at the **root level of the repository**, preserving their original directory structure.
+
+---
 # Authors and acknowledgment
 
 Edouard Paupe
