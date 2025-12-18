@@ -9,6 +9,7 @@ __pycache__/
 .eggs/
 dist/
 build/
+.DS_Store
 
 # -------------------------
 # Virtual environments
