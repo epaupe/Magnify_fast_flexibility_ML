@@ -20,8 +20,8 @@ from torch.utils.tensorboard import SummaryWriter
 # =====================================================
 
 #Change BASE_DIR to your local path where the data is stored
-#BASE_DIR = "/Users/edouardpaupe/Desktop/Magnify_fast_flexibility_ML"
-BASE_DIR = "C:\\Users\\palo\\magnify-main_DATABASE_SCALAR"
+BASE_DIR = "/Users/edouardpaupe/Desktop/Magnify_fast_flexibility_ML"
+#BASE_DIR = "C:\\Users\\palo\\magnify-main_DATABASE_SCALAR"
 CLIMATE_IDS = range(6)  # 0–5
 
 FLEX_BASE_DIR = os.path.join(BASE_DIR, "data")
@@ -703,7 +703,7 @@ def train_model(
     model.load_state_dict(torch.load(save_path))
     return model
 
-def test_model(model, test_loader, device=DEVICE, results_dir=None):
+def  test_model(model, test_loader, device=DEVICE, results_dir=None):
     """
     Evaluate trained model on test set:
       - Mean Absolute Error (MAE)

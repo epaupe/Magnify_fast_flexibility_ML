@@ -3,6 +3,10 @@
 
 ---
 
+This work was supported by the Swiss Data Science Center (SDSC) under grant number C23-01L, and by the National Centre of Competence in Research (NCCR) Automation, funded by the Swiss National Science Foundation (grant number 51NF40 225155).
+
+I would like to sincerely thank Carl Remlinger (SDSC) for his valuable contributions in refining and extending this work.
+
 ## **Project Overview**
 This repository provides a complete computational framework to **quantify and predict building demand-side flexibility**. It unifies:
 
